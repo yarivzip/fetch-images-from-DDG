@@ -66,6 +66,14 @@ class ImageGalleryWindow:
         self.main_frame = ctk.CTkFrame(self.top)
         self.main_frame.pack(fill="both", expand=True, padx=10, pady=10)
         
+        # Add header label at the top
+        self.counter_label = ctk.CTkLabel(
+            self.main_frame, 
+            text="Loading images...",
+            font=("Helvetica", 14, "bold")
+        )
+        self.counter_label.pack(pady=(0, 10))
+        
         # Create canvas with white background for better visibility
         self.canvas = ctk.CTkCanvas(self.main_frame, bg="white", highlightthickness=0)
         self.scrollbar = ctk.CTkScrollbar(self.main_frame, orientation="vertical", command=self.canvas.yview)
@@ -86,8 +94,8 @@ class ImageGalleryWindow:
         self.main_frame.grid_columnconfigure(0, weight=1)
         
         # Grid layout for canvas and scrollbar
-        self.canvas.grid(row=0, column=0, sticky="nsew")
-        self.scrollbar.grid(row=0, column=1, sticky="ns")
+        self.canvas.pack(side="left", fill="both", expand=True)
+        self.scrollbar.pack(side="right", fill="y")
         
         # Bind canvas resizing
         self.canvas.bind('<Configure>', self._on_canvas_configure)
@@ -179,6 +187,9 @@ class ImageGalleryWindow:
             
             # Configure column weights
             self.scrollable_frame.grid_columnconfigure(self.current_row % self.images_per_row, weight=1)
+            
+            # Update counter label
+            self.counter_label.configure(text=f"Total Images: {self.current_row}")
             
         except Exception as e:
             logging.error(f"Error adding image to gallery: {str(e)}")
