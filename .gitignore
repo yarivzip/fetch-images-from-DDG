@@ -1,3 +1,5 @@
 /downloaded_images
 /files
 /image_downloader.log
+/logs
+*.log
