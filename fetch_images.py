@@ -98,6 +98,7 @@ class ImageGalleryWindow:
         self.images_per_row = 3
         self.image_frames = {}
         self.current_replacements = {}
+        self.used_urls = {}
         
     def _on_canvas_configure(self, event):
         # Update the scrollable region when the canvas is resized
@@ -121,7 +122,9 @@ class ImageGalleryWindow:
             
             # Resize image
             img.thumbnail((200, 200))
-            photo = ImageTk.PhotoImage(img)
+            
+            # Convert to CTkImage
+            photo = ctk.CTkImage(light_image=img, dark_image=img, size=img.size)
             
             # Keep reference to prevent garbage collection
             self.image_references[filename] = {
@@ -144,7 +147,7 @@ class ImageGalleryWindow:
                                     wraplength=250,  
                                     font=("Helvetica", 12),  
                                     height=120)  
-            desc_label.pack(padx=10, pady=(5, 10), fill="both", expand=True)  
+            desc_label.pack(padx=10, pady=(5, 10), fill="both", expand=True)
             
             # Add Replace button
             replace_button = ctk.CTkButton(
@@ -194,10 +197,7 @@ class ImageGalleryWindow:
                 desc_col = self.parent.description_column_var.get()
                 
                 # Find the matching row in Excel
-                base_filename = filename
-                if base_filename.lower().endswith('.jpg'):
-                    base_filename = base_filename[:-4]
-                    
+                base_filename = filename[:-4] if filename.lower().endswith('.jpg') else filename
                 matching_row = df[df[filename_col].astype(str) == base_filename]
                 if not matching_row.empty:
                     description = str(matching_row.iloc[0][desc_col])
@@ -209,34 +209,28 @@ class ImageGalleryWindow:
                 description = self.image_references[filename]['description']
                 logging.warning("Excel file not found, using stored description")
             
-            # Improve search by adding product context if available
-            search_terms = []
-            if "product" in description.lower():
-                search_terms.append(description)
-            else:
-                search_terms.append(f"product {description}")
-            search_terms.append(description)
+            # Keep track of previously used URLs for this image
+            if not hasattr(self, 'used_urls'):
+                self.used_urls = {}
+            if filename not in self.used_urls:
+                self.used_urls[filename] = set()
             
-            # Try each search term until we find results
-            results = []
-            for term in search_terms:
-                logging.info(f"Searching for: {term}")
-                results = self.parent.search_images(term)
-                if results:
-                    break
+            # Get search results
+            results = self.parent.search_images(description)
             
-            if not results:
-                messagebox.showinfo("Info", "No replacement images found")
+            # Filter out previously used URLs
+            new_results = [r for r in results if r['image'] not in self.used_urls[filename]]
+            
+            if not new_results:
+                # If no new results, clear history and try again
+                self.used_urls[filename].clear()
+                messagebox.showinfo("Info", "No more new images found. Resetting search history.")
                 return
-                
-            # Find first unused image
-            for result in results:
+            
+            # Try each result until we find one that works
+            for result in new_results:
                 image_url = result['image']
                 
-                # Skip if this URL was already tried
-                if filename in self.current_replacements and image_url == self.current_replacements[filename].get('url'):
-                    continue
-                    
                 try:
                     # Download and process image
                     requests = LazyLoader.requests()
@@ -253,26 +247,27 @@ class ImageGalleryWindow:
                         # Resize for preview
                         img.thumbnail((200, 200))
                         
-                        # Update preview
+                        # Convert to CTkImage
                         photo = ImageTk.PhotoImage(img)
                         self.image_frames[filename]['image_label'].configure(image=photo)
                         self.image_frames[filename]['photo'] = photo
                         self.image_frames[filename]['approve_button'].configure(state="normal")
                         
-                        # Store replacement data
+                        # Store replacement data and mark URL as used
                         self.current_replacements[filename] = {
                             'url': image_url,
                             'data': response.content,
-                            'description': description  
+                            'description': description
                         }
+                        self.used_urls[filename].add(image_url)
                         
                         return
                         
                 except Exception as e:
                     logging.error(f"Error downloading replacement image: {str(e)}")
                     continue
-                    
-            messagebox.showinfo("Info", "No more replacement images available")
+            
+            messagebox.showinfo("Info", "Could not find any suitable replacement images. Try a different search term.")
             
         except Exception as e:
             logging.error(f"Error getting replacement: {str(e)}")
@@ -532,14 +527,6 @@ class ImageDownloaderApp:
         self.main_frame = ctk.CTkFrame(self.window)
         self.main_frame.pack(pady=20, padx=20, fill="both", expand=True)
         
-        # Add Single Image Download button at the top
-        self.single_image_button = ctk.CTkButton(
-            self.main_frame,
-            text="Single Image Download",
-            command=self.open_single_image_window
-        )
-        self.single_image_button.pack(pady=(0, 10))
-        
         # Add separator
         self.separator = ctk.CTkFrame(self.main_frame, height=2, fg_color="gray75")
         self.separator.pack(fill="x", pady=10)
@@ -614,6 +601,13 @@ class ImageDownloaderApp:
         # Control buttons frame
         self.control_frame = ctk.CTkFrame(self.main_frame)
         self.control_frame.pack(fill="x", pady=(0, 10))
+        
+        self.single_image_button = ctk.CTkButton(
+            self.control_frame,
+            text="Single Image Download",
+            command=self.open_single_image_window
+        )
+        self.single_image_button.pack(side="left", padx=5)
         
         self.start_button = ctk.CTkButton(self.control_frame, text="Start Download", command=self.start_download, width=150)
         self.start_button.pack(side="left", padx=5)
@@ -721,7 +715,7 @@ class ImageDownloaderApp:
         except Exception as e:
             logging.error(f"Error searching for images: {str(e)}")
             return []
-
+    
     def process_item(self, row, output_dir, max_size):
         """Process a single item from the Excel file"""
         try:
