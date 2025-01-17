@@ -1,0 +1,8 @@
+{
+    "description_column": "תאור",
+    "filename_column": "מק\"ט",
+    "max_size": "800",
+    "concurrent_downloads": "3",
+    "skip_existing": true,
+    "download_directory": "D:/tools/fetch-images-from-DDG/download2"
+}

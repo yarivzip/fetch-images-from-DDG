@@ -5,7 +5,7 @@ A Python-based GUI application for downloading product images from DuckDuckGo se
 ## Features
 
 ### Batch Processing
-- Read product data from Excel files (SKUs and descriptions)
+- Read product data from Excel files (filenames and descriptions)
 - Concurrent downloads for improved performance
 - Skip existing files option
 - Progress tracking with detailed statistics
@@ -68,21 +68,42 @@ python fetch_images.py
 6. Click "Save Image" when satisfied
 
 ### Excel File Format
-Your Excel file must contain these columns:
-- `מק"ט`: SKU/Product ID (string)
-- `תאור`: Product Description (string)
+Your Excel file must contain two main columns (names configurable in settings):
+- Filename column (default: `שם קובץ`)
+- Product Description column (default: `תאור`)
+
+The column names can be changed in the application settings and will be remembered for future use.
+Note: The .jpg extension will be automatically added to filenames if not present.
 
 Example:
-| מק"ט | תאור |
-|------|-------|
-| 10001 | מוצר א |
-| 10002 | מוצר ב |
+| שם קובץ | תאור |
+|---------|-------|
+| product-1 | מוצר א |
+| product-2 | מוצר ב |
+
+### User Preferences
+The application saves your preferences automatically, including:
+- Column names for Filename and Description
+- Maximum image size
+- Number of concurrent downloads
+- Skip existing files setting
+
+These settings are stored in `user_preferences.json` and are loaded automatically when you start the application.
+
+### Settings
+All settings are automatically saved and loaded between sessions:
+- Description Column Name (default: `תאור`)
+- Filename Column Name (default: `שם קובץ`)
+- Download Directory (default: `downloaded_images`)
+- Maximum Image Size (default: 800px)
+- Concurrent Downloads (default: 3)
+- Skip Existing Files (enabled by default)
 
 ### Output Structure
 ```
-/downloaded_images/
-    ├── [SKU].jpg         # Final images
-    └── /temp/            # Temporary files
+[Download Directory]/          # Configurable, default: /downloaded_images/
+    ├── [Filename].jpg        # Downloaded images
+    └── /temp/                # Temporary files
 /logs/
     └── image_downloader_[TIMESTAMP].log
 ```
